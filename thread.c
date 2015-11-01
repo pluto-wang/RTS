@@ -5,7 +5,7 @@
 #include<string.h>
 #include<unistd.h>
 
-static int turn=0;
+
 
 void *t1(){
 
@@ -14,7 +14,7 @@ void *t1(){
 		i--;
 		printf("Thread 1 is running.\n");
 		usleep(1000);
-	}	
+	}
 }
 
 
@@ -25,7 +25,7 @@ void *t2(){
 		i--;
 		printf("Thread 2 is running.\n");
 		usleep(1000);
-	}	
+	}
 }
 
 
