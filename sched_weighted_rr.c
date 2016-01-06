@@ -33,16 +33,8 @@ static void update_curr_weighted_rr(struct rq *rq)
 static void enqueue_task_weighted_rr(struct rq *rq, struct task_struct *p, int wakeup, bool b)
 {
 	// not yet implemented
-	struct sched_wrr_entity *wrr_se = &p->wrr;
-	struct weighted_rr_rq *wrr_rq ;
-	struct list_head *head;
-
-	wrr_rq = &rq->weighted_rr;
-	head = &wrr_rq->queue;
-	//head = &wrr_se->run_list;
-	list_add_tail(&wrr_se->run_list,head);
-	wrr_rq->nr_running++;
-	// ...
+	list_add_tail(&p->weighted_rr_list_item,&rq->weighted_rr.queue);
+	rq->weighted_rr.nr_running++;
 }
 
 static void dequeue_task_weighted_rr(struct rq *rq, struct task_struct *p, int sleep)
@@ -50,13 +42,10 @@ static void dequeue_task_weighted_rr(struct rq *rq, struct task_struct *p, int s
 	// first update the task's runtime statistics
 	update_curr_weighted_rr(rq);
 	// not yet implemented
-	struct sched_wrr_entity *wrr_se = &p->wrr;
-	struct weighted_rr_rq *wrr_rq;
 	
-	wrr_rq = &rq->weighted_rr;
-	list_del_init(&wrr_se->run_list);
-	wrr_rq->nr_running--;
-// ...	
+	list_del(&p->weighted_rr_list_item);
+	rq->weighted_rr.nr_running--;
+
 }
 
 /*
@@ -75,7 +64,8 @@ static void requeue_task_weighted_rr(struct rq *rq, struct task_struct *p)
 static void yield_task_weighted_rr(struct rq *rq)
 {
 	// not yet implemented
-	requeue_task_weighted_rr(rq,rq->curr);
+
+	list_move_tail(&rq->curr->weighted_rr_list_item,&rq->weighted_rr.queue);
 	// ...
 }
 
@@ -94,21 +84,17 @@ static struct task_struct *pick_next_task_weighted_rr(struct rq *rq)
 {
 	// ...
 	struct task_struct *p;
-	struct sched_wrr_entity *wrr_se;
 	struct weighted_rr_rq *wrr_rq;
-	struct list_head *head;
+	struct list_head *queue;
 
 	if(unlikely(!wrr_rq->nr_running)){ 
 		return NULL;
 	}
 	wrr_rq = &rq->weighted_rr;	
-	wrr_se = &p->wrr;
-	//head = &wrr_se->run_list;
-	head = &wrr_rq->queue;
-	wrr_se = list_entry(head->next, struct sched_wrr_entity, run_list);
-	p=container_of(wrr_se, struct task_struct, wrr);
+	queue = &rq->weighted_rr.queue;
+	
+	p=list_first_entry(queue, struct task_struct, weighted_rr_list_item);
 	p->se.exec_start = rq->clock;
-
 	return p;
 }
 
@@ -199,15 +185,17 @@ move_one_task_weighted_rr(struct rq *this_rq, int this_cpu, struct rq *busiest,
  */
 static void task_tick_weighted_rr(struct rq *rq, struct task_struct *p,int queued)
 {
+	//struct weighted_rr_rq *weighted_rr_rq; 
+
 	update_curr_weighted_rr(rq);
 	if(--p->wrr.time_slice>0)
 		return;
-	p->wrr.time_slice = DEF_TIMESLICE * p->wrr_weight;
+	
+	p->task_time_slice = weighted_rr_time_slice;
 
-	if(p->wrr.run_list.prev != p->wrr.run_list.next){
-		requeue_task_weighted_rr(rq, p);
-		set_tsk_need_resched(p);
-	}
+	set_tsk_need_resched(p);
+	requeue_task_weighted_rr(rq, p);
+	return;
 
 }
 
